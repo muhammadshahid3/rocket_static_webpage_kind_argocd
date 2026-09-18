@@ -3,7 +3,7 @@ namespace: rocket
 argocd:
   enabled: true
 
-name: rocket-Deployment
+name: rocket-service
 replicaCount: 1
 
 image:
