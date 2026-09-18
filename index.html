@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MISSION CONTROL // LAUNCH-01</title>
+<style>
+  :root{
+    --void:#050813;
+    --panel:#0b1226;
+    --panel-line:#1c2b4a;
+    --text:#cfe0ff;
+    --text-dim:#5f7fa8;
+    --flame:#ff7a3d;
+    --flame-hot:#ffd166;
+    --ok:#5ff0a4;
+    --warn:#ffcf5c;
+    --earth-a:#1c6fa5;
+    --earth-b:#123a5e;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--void);
+    font-family: 'Courier New', ui-monospace, Menlo, monospace;
+    color:var(--text);
+    overflow:hidden;
+  }
+  #app{ position:relative; width:100vw; height:100vh; }
+
+  /* ---------- STARFIELD ---------- */
+  #stars, #stars2{
+    position:absolute; inset:0; z-index:0;
+  }
+
+  /* ---------- SCENE ---------- */
+  .scene{
+    position:absolute; inset:0; z-index:1;
+    overflow:hidden;
+  }
+
+  /* ---- pad view ---- */
+  #padView{
+    position:absolute; inset:0;
+  }
+  .horizon{
+    position:absolute; left:0; right:0; bottom:0; height:34%;
+    background:linear-gradient(180deg, #0d1730 0%, #0a1122 40%, #060a15 100%);
+    border-top:1px solid #223454;
+  }
+  .horizon::before{
+    content:""; position:absolute; top:-2px; left:0; right:0; height:2px;
+    background:linear-gradient(90deg, transparent, #3a5580, transparent);
+  }
+  .tower{
+    position:absolute; bottom:34%; left:28%;
+    width:10px; height:30%;
+    background:repeating-linear-gradient(0deg, #2a3d5f 0 6px, #17223a 6px 12px);
+    box-shadow:0 0 0 1px #17223a;
+  }
+  .tower::before, .tower::after{
+    content:""; position:absolute; background:#2a3d5f;
+    width:34px; height:3px; left:-12px;
+  }
+  .tower::before{ top:10%; }
+  .tower::after{ top:32%; }
+
+  .pad-base{
+    position:absolute; bottom:33%; left:50%; transform:translateX(-50%);
+    width:120px; height:14px; border-radius:3px;
+    background:#1a2740; box-shadow:0 0 0 1px #2a3d5f;
+  }
+
+  .rocket-wrap{
+    position:absolute; bottom:calc(33% + 12px); left:50%;
+    transform:translate(-50%, 0);
+    width:46px; height:150px;
+    z-index:3;
+    transition: transform 3.6s cubic-bezier(.35,0,.2,1), opacity .6s ease;
+  }
+  .rocket-wrap.launched{
+    transform:translate(-50%, -145vh) scale(.7);
+  }
+  .rocket-wrap.hidden-rocket{ opacity:0; }
+
+  .rocket-svg{ width:100%; height:100%; display:block; filter:drop-shadow(0 0 6px rgba(200,220,255,.15)); }
+
+  .flame{
+    position:absolute; left:50%; top:100%; transform:translateX(-50%);
+    width:26px; height:0px;
+    background:radial-gradient(ellipse at 50% 0%, var(--flame-hot) 0%, var(--flame) 45%, rgba(255,122,61,0) 80%);
+    border-radius:0 0 50% 50%;
+    opacity:0;
+    transition:height .25s ease, opacity .25s ease;
+    filter: blur(1px);
+  }
+  .rocket-wrap.ignite .flame{ height:38px; opacity:1; animation: flameFlicker .12s infinite alternate; }
+  .rocket-wrap.launched .flame{ height:56px; opacity:1; }
+  @keyframes flameFlicker{ from{ transform:translateX(-50%) scaleX(1); } to{ transform:translateX(-50%) scaleX(.85); } }
+
+  .smoke{
+    position:absolute; bottom:32%; left:50%; width:10px; height:10px;
+    border-radius:50%; background:rgba(200,205,215,.55);
+    pointer-events:none; z-index:2;
+    animation: smokeRise 1.6s ease-out forwards;
+  }
+  @keyframes smokeRise{
+    0%{ opacity:.55; transform:translate(-50%,0) scale(1); }
+    100%{ opacity:0; transform:translate(calc(-50% + var(--dx,0px)), -90px) scale(3.2); }
+  }
+
+  .shake{ animation: camShake .12s infinite; }
+  @keyframes camShake{
+    0%{ transform:translate(0,0); } 25%{ transform:translate(1px,-1px); }
+    50%{ transform:translate(-1px,1px); } 75%{ transform:translate(1px,1px); }
+    100%{ transform:translate(0,0); }
+  }
+
+  /* ---- orbit view ---- */
+  #orbitView{
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    opacity:0; pointer-events:none;
+    transition:opacity 1s ease;
+  }
+  #orbitView.show{ opacity:1; }
+
+  .earth{
+    position:relative;
+    width:220px; height:220px; border-radius:50%;
+    background:
+      radial-gradient(circle at 32% 28%, rgba(255,255,255,.35), rgba(255,255,255,0) 25%),
+      radial-gradient(circle at 65% 70%, var(--earth-a), var(--earth-b) 60%, #06172a 100%);
+    box-shadow: 0 0 50px 6px rgba(43,110,165,.35), inset -18px -18px 40px rgba(0,0,0,.55);
+  }
+  .earth::before{
+    content:""; position:absolute; inset:0; border-radius:50%;
+    background:
+      radial-gradient(circle at 25% 60%, rgba(90,180,110,.55) 0 10%, transparent 11%),
+      radial-gradient(circle at 60% 30%, rgba(90,180,110,.5) 0 14%, transparent 15%),
+      radial-gradient(circle at 75% 65%, rgba(90,180,110,.45) 0 8%, transparent 9%);
+    filter:blur(1px);
+  }
+
+  .orbit-path{
+    position:absolute; width:380px; height:380px;
+    border:1px dashed rgba(140,170,220,.35);
+    border-radius:50%;
+    top:50%; left:50%; margin:-190px 0 0 -190px;
+  }
+  .orbit-rotator{
+    position:absolute; inset:0;
+    animation: spin 6s linear infinite;
+  }
+  @keyframes spin{ from{ transform:rotate(0deg); } to{ transform:rotate(360deg); } }
+
+  .orbit-rocket{
+    position:absolute; top:-11px; left:50%;
+    width:22px; height:22px; margin-left:-11px;
+    transform: rotate(90deg);
+  }
+  .orbit-rocket svg{ width:100%; height:100%; }
+
+  /* ---------- HUD ---------- */
+  .hud{
+    position:absolute; z-index:10; inset:0; pointer-events:none;
+    display:flex; flex-direction:column; justify-content:space-between;
+  }
+  .hud-top{
+    display:flex; justify-content:space-between; align-items:flex-start;
+    padding:22px 28px; pointer-events:none;
+  }
+  .brand{ font-size:13px; letter-spacing:2px; color:#7ea3e0; }
+  .brand b{ color:var(--text); }
+  .clock{ font-size:12px; color:#7ea3e0; text-align:right; }
+
+  .telemetry{
+    display:flex; gap:26px; padding:0 28px;
+    flex-wrap:wrap;
+  }
+  .tele-item{ min-width:110px; }
+  .tele-label{ font-size:10px; color:#6d86b8; letter-spacing:1.5px; }
+  .tele-value{ font-size:20px; color:var(--text); margin-top:2px; }
+  .tele-value.status-ok{ color:var(--ok); }
+  .tele-value.status-warn{ color:var(--warn); }
+
+  .hud-bottom{
+    display:flex; flex-direction:column; align-items:center;
+    padding:22px 0 30px 0; gap:12px; pointer-events:auto;
+  }
+  .mission-log{
+    font-size:12px; color:#9db8e6; min-height:16px; letter-spacing:.5px;
+  }
+
+  #launchBtn{
+    pointer-events:auto;
+    background:linear-gradient(180deg, #d64a2e, #a52a1c);
+    color:#fff2ea;
+    border:1px solid #ff8a5c;
+    padding:14px 42px;
+    font-size:15px; letter-spacing:3px; font-weight:bold;
+    border-radius:6px; cursor:pointer;
+    box-shadow:0 0 0 rgba(255,110,60,0), 0 6px 18px rgba(200,60,20,.35);
+    transition: transform .15s ease, box-shadow .15s ease, opacity .3s ease;
+  }
+  #launchBtn:hover{ transform:translateY(-1px); box-shadow:0 0 22px rgba(255,120,60,.55), 0 8px 20px rgba(200,60,20,.4); }
+  #launchBtn:active{ transform:translateY(1px); }
+  #launchBtn:disabled{ opacity:.35; cursor:not-allowed; transform:none; box-shadow:none; }
+  #launchBtn.reset{ background:linear-gradient(180deg, #2b6fa5, #163d5e); border-color:#5fa8e0; }
+
+  .panel-title{
+    text-align:center; font-size:11px; color:#6d86b8; letter-spacing:3px; margin-bottom:2px;
+  }
+
+  @media (max-width:520px){
+    .telemetry{ gap:14px; padding:0 14px; }
+    .tele-item{ min-width:80px; }
+    .tele-value{ font-size:16px; }
+    .hud-top{ padding:16px 16px; }
+    #launchBtn{ padding:12px 28px; font-size:13px; letter-spacing:2px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .rocket-wrap, .smoke, .orbit-rotator, .shake{ animation:none !important; transition:none !important; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="stars"></canvas>
+
+  <div class="scene" id="scene">
+    <div id="padView">
+      <div class="tower"></div>
+      <div class="pad-base"></div>
+      <div class="rocket-wrap" id="rocketWrap">
+        <svg class="rocket-svg" viewBox="0 0 46 150" xmlns="http://www.w3.org/2000/svg">
+          <!-- nose -->
+          <path d="M23 0 C33 14, 34 34, 34 46 L12 46 C12 34, 13 14, 23 0 Z" fill="#e7edf7"/>
+          <!-- window -->
+          <circle cx="23" cy="34" r="4.5" fill="#3a6fb0"/>
+          <!-- body -->
+          <rect x="12" y="46" width="22" height="72" fill="#d9e1f0"/>
+          <rect x="12" y="46" width="22" height="72" fill="url(#stripe)"/>
+          <!-- fins -->
+          <path d="M12 96 L0 122 L12 118 Z" fill="#b7263a"/>
+          <path d="M34 96 L46 122 L34 118 Z" fill="#b7263a"/>
+          <!-- engine skirt -->
+          <path d="M12 118 L34 118 L30 132 L16 132 Z" fill="#8a94a6"/>
+          <defs>
+            <linearGradient id="stripe" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0.55" stop-color="#d9e1f0"/>
+              <stop offset="0.551" stop-color="#b7263a"/>
+              <stop offset="0.60" stop-color="#b7263a"/>
+              <stop offset="0.601" stop-color="#d9e1f0"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div class="flame" id="flame"></div>
+      </div>
+      <div class="horizon"></div>
+    </div>
+
+    <div id="orbitView">
+      <div class="earth"></div>
+      <div class="orbit-path">
+        <div class="orbit-rotator" id="orbitRotator">
+          <div class="orbit-rocket">
+            <svg viewBox="0 0 46 150" xmlns="http://www.w3.org/2000/svg">
+              <path d="M23 0 C33 14, 34 34, 34 46 L12 46 C12 34, 13 14, 23 0 Z" fill="#e7edf7"/>
+              <rect x="12" y="46" width="22" height="72" fill="#d9e1f0"/>
+              <path d="M12 96 L0 122 L12 118 Z" fill="#b7263a"/>
+              <path d="M34 96 L46 122 L34 118 Z" fill="#b7263a"/>
+              <path d="M12 118 L34 118 L30 132 L16 132 Z" fill="#8a94a6"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hud">
+    <div class="hud-top">
+      <div class="brand">MISSION CONTROL &nbsp;//&nbsp; <b>LAUNCH-01</b></div>
+      <div class="clock" id="clock">T- 00:00:00</div>
+    </div>
+
+    <div class="telemetry">
+      <div class="tele-item">
+        <div class="tele-label">STATUS</div>
+        <div class="tele-value" id="valStatus">STANDBY</div>
+      </div>
+      <div class="tele-item">
+        <div class="tele-label">ALTITUDE</div>
+        <div class="tele-value" id="valAlt">0 km</div>
+      </div>
+      <div class="tele-item">
+        <div class="tele-label">VELOCITY</div>
+        <div class="tele-value" id="valVel">0 km/s</div>
+      </div>
+      <div class="tele-item">
+        <div class="tele-label">STAGE</div>
+        <div class="tele-value" id="valStage">1 / 2</div>
+      </div>
+    </div>
+
+    <div class="hud-bottom">
+      <div class="panel-title">GROUND CONTROL</div>
+      <div class="mission-log" id="log">Systems nominal. Awaiting launch command.</div>
+      <button id="launchBtn">LAUNCH</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---------- starfield ----------
+  const canvas = document.getElementById('stars');
+  const ctx = canvas.getContext('2d');
+  function resize(){
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    drawStars();
+  }
+  let stars = [];
+  function makeStars(){
+    stars = [];
+    const count = Math.floor((window.innerWidth*window.innerHeight)/6000);
+    for(let i=0;i<count;i++){
+      stars.push({
+        x: Math.random()*window.innerWidth,
+        y: Math.random()*window.innerHeight,
+        r: Math.random()*1.3 + 0.2,
+        a: Math.random()*0.6 + 0.3,
+        tw: Math.random()*0.02 + 0.005,
+        dir: Math.random() < 0.5 ? 1 : -1
+      });
+    }
+  }
+  function drawStars(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    for(const s of stars){
+      ctx.globalAlpha = s.a;
+      ctx.fillStyle = '#cfe0ff';
+      ctx.beginPath();
+      ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function twinkle(){
+    for(const s of stars){
+      s.a += s.tw*s.dir;
+      if(s.a>0.9||s.a<0.25) s.dir*=-1;
+    }
+    drawStars();
+    requestAnimationFrame(twinkle);
+  }
+  window.addEventListener('resize', ()=>{ resize(); makeStars(); });
+  resize(); makeStars(); twinkle();
+
+  // ---------- mission sequence ----------
+  const rocketWrap = document.getElementById('rocketWrap');
+  const flame = document.getElementById('flame');
+  const scene = document.getElementById('scene');
+  const padView = document.getElementById('padView');
+  const orbitView = document.getElementById('orbitView');
+  const btn = document.getElementById('launchBtn');
+  const log = document.getElementById('log');
+  const clock = document.getElementById('clock');
+
+  const valStatus = document.getElementById('valStatus');
+  const valAlt = document.getElementById('valAlt');
+  const valVel = document.getElementById('valVel');
+  const valStage = document.getElementById('valStage');
+
+  let launched = false;
+  let countdownTimer = null;
+  let smokeTimer = null;
+  let altTimer = null;
+
+  function setLog(text){ log.textContent = text; }
+  function setStatus(text, cls){
+    valStatus.textContent = text;
+    valStatus.className = 'tele-value' + (cls? ' '+cls : '');
+  }
+
+  function spawnSmoke(){
+    const s = document.createElement('div');
+    s.className = 'smoke';
+    const dx = (Math.random()-0.5)*140;
+    s.style.setProperty('--dx', dx+'px');
+    s.style.left = (50 + (Math.random()-0.5)*10) + '%';
+    padView.appendChild(s);
+    setTimeout(()=> s.remove(), 1700);
+  }
+
+  function runCountdown(){
+    let t = 3;
+    setStatus('COUNTDOWN', 'status-warn');
+    clock.textContent = 'T- 00:00:0'+t;
+    countdownTimer = setInterval(()=>{
+      t--;
+      if(t>0){
+        clock.textContent = 'T- 00:00:0'+t;
+        setLog('T-minus '+t+'. Holding all systems go.');
+      } else {
+        clearInterval(countdownTimer);
+        ignite();
+      }
+    }, 700);
+  }
+
+  function ignite(){
+    setLog('Ignition sequence start.');
+    clock.textContent = 'T+ 00:00:00';
+    rocketWrap.classList.add('ignite');
+    scene.classList.add('shake');
+    setTimeout(liftoff, 550);
+  }
+
+  function liftoff(){
+    setStatus('LIFTOFF', 'status-warn');
+    setLog('Liftoff! We have liftoff.');
+    rocketWrap.classList.remove('ignite');
+    rocketWrap.classList.add('launched');
+    smokeTimer = setInterval(spawnSmoke, 90);
+
+    let alt = 0, vel = 0, seconds = 0;
+    altTimer = setInterval(()=>{
+      seconds++;
+      alt = Math.min(400, alt + 8 + seconds*3);
+      vel = Math.min(7.8, vel + 0.55);
+      valAlt.textContent = Math.round(alt) + ' km';
+      valVel.textContent = vel.toFixed(1) + ' km/s';
+      clock.textContent = 'T+ 00:00:0'+seconds;
+      if(seconds === 1) setLog('Max Q. Vehicle is supersonic.');
+      if(seconds === 2){ setLog('Stage separation confirmed.'); valStage.textContent = '2 / 2'; }
+      if(seconds === 3) setLog('Fairing jettisoned. Nominal trajectory.');
+      if(seconds >= 4){
+        clearInterval(altTimer);
+      }
+    }, 700);
+
+    setTimeout(reachOrbit, 3600);
+  }
+
+  function reachOrbit(){
+    clearInterval(smokeTimer);
+    padView.style.display = 'none';
+    orbitView.classList.add('show');
+    setStatus('ORBIT ACHIEVED', 'status-ok');
+    setLog('Orbital insertion complete. Standing by.');
+    valAlt.textContent = '400 km';
+    valVel.textContent = '7.8 km/s';
+    valStage.textContent = 'ORBITAL';
+    clock.textContent = 'T+ ORBIT';
+
+    btn.textContent = 'RELAUNCH';
+    btn.classList.add('reset');
+    btn.disabled = false;
+  }
+
+  function resetScene(){
+    padView.style.display = 'block';
+    orbitView.classList.remove('show');
+    scene.classList.remove('shake');
+    rocketWrap.classList.remove('launched','ignite');
+    btn.textContent = 'LAUNCH';
+    btn.classList.remove('reset');
+    setStatus('STANDBY');
+    valAlt.textContent = '0 km';
+    valVel.textContent = '0 km/s';
+    valStage.textContent = '1 / 2';
+    clock.textContent = 'T- 00:00:00';
+    setLog('Systems nominal. Awaiting launch command.');
+    launched = false;
+  }
+
+  btn.addEventListener('click', ()=>{
+    if(btn.classList.contains('reset')){
+      resetScene();
+      return;
+    }
+    if(launched) return;
+    launched = true;
+    btn.disabled = true;
+    runCountdown();
+  });
+})();
+</script>
+</body>
+</html>

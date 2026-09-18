@@ -1,0 +1,16 @@
+namespace: rocket
+
+argocd:
+  enabled: true
+
+name: rocket-service
+replicaCount: 1
+
+image:
+  repository: shahiddevops1/rocket-site
+  tag: latest
+  pullPolicy: Always
+
+service:
+  type: ClusterIP
+  port: 8000
