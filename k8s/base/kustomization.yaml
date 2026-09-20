@@ -6,6 +6,5 @@ resources:
   - service.yaml
   - ingress.yaml
 images:
-  - name: my-website
-    newName: shahiddevops1/rocket-site
+  - name: shahiddevops1/rocket-site
     newTag: v2
