@@ -16,8 +16,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                # apni Service ka naam yahan daalo (jo static html/css/js serve
-                # karne waali Deployment ke aage lagi hai)
-                name: website-service
+                name: website
                 port:
                   number: 80
