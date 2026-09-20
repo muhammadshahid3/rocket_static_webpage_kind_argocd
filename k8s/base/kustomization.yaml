@@ -8,4 +8,4 @@ resources:
 images:
   - name: my-website
     newName: shahiddevops1/rocket-site
-    newTag: latest
+    newTag: v2
