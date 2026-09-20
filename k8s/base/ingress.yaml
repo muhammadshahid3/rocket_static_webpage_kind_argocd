@@ -1,0 +1,23 @@
+# Ye file apne static-website repo ke k8s/base folder me add karo
+# (wahi repo jo pro.yaml me reference hai: rocket_static_webpage_kind_argocd)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: website-ingress
+  namespace: website
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                # apni Service ka naam yahan daalo (jo static html/css/js serve
+                # karne waali Deployment ke aage lagi hai)
+                name: website-service
+                port:
+                  number: 80
